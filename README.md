@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方塊決鬥</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .game-container {
+            max-width: 90%;
+            width: 800px;
+            background-color: #2d3748;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #4fd1c5;
+            margin-bottom: 1rem;
+        }
+
+        /* 更新遊戲說明，包含新的 F 鍵功能 */
+        .game-instructions, .text-lg {
+            font-size: 1rem;
+            color: #a0aec0;
+            margin-bottom: 1.5rem;
+        }
+
+        canvas {
+            background-color: #38b2ac;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            height: auto;
+            border: 2px solid #4fd1c5;
+        }
+
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1a202c;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+        }
+
+        .health-bar-container {
+            width: 100%;
+            height: 20px;
+            background-color: #4a5568;
+            border-radius: 9999px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .health-bar {
+            height: 100%;
+            transition: width 0.3s ease-in-out;
+        }
+
+        .restart-button {
+            background-color: #4fd1c5;
+            color: #1a202c;
+            font-weight: 700;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            margin-top: 1.5rem;
+        }
+
+        .restart-button:hover {
+            background-color: #38b2ac;
+            transform: translateY(-2px);
+        }
+
+        .skill-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            border-radius: 1rem;
+        }
+
+        .skill-button {
+            background-color: #4a5568;
+            color: #fff;
+            padding: 1rem 2rem;
+            margin: 0.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+            text-align: left;
+        }
+
+        .skill-button:hover {
+            background-color: #637080;
+        }
+
+        .skill-button-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #4fd1c5;
+        }
+
+        #wave-counter {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4fd1c5;
+            margin-bottom: 1rem;
+        }
+
+        #enemy-type {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #a0aec0;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1 class="game-title">方塊決鬥</h1>
+        <!-- 更新遊戲說明 -->
+        <p class="game-instructions" id="gameInstructions">使用 WASD 或方向鍵移動，按空白鍵攻擊。按 F 鍵進行治療（冷卻 20 秒）。</p>
+
+        <div id="skillSelection" class="skill-selection">
+            <h2 class="text-2xl font-bold mb-4">選擇你的技能</h2>
+            <div id="skillButtons" class="w-full"></div>
+        </div>
+
+        <p class="text-lg font-bold" id="playerHealthText">你的生命</p>
+        <div class="health-bar-container" id="playerHealthContainer">
+            <div id="playerHealthBar" class="health-bar bg-green-500" style="width: 100%;"></div>
+        </div>
+        
+        <!-- 已移除 F 鍵治療冷卻狀態顯示 UI -->
+        
+        <p id="wave-counter" style="display: none;">第 1 波</p>
+        <p id="enemy-type" style="display: none;"></p>
+
+        <canvas id="gameCanvas" width="800" height="600" style="display: none;"></canvas>
+
+        <p class="text-lg font-bold" id="enemyHealthText">敵人生命</p>
+        <div class="health-bar-container" id="enemyHealthContainer">
+            <div id="enemyHealthBar" class="health-bar bg-red-500" style="width: 100%;"></div>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box">
+        <p id="message-text" class="text-xl font-bold mb-4"></p>
+        <button class="restart-button" onclick="restartGame()">重新開始</button>
+    </div>
+
+    <script>
+        // 取得 canvas 和繪圖環境
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('message-box');
+        const messageTextElement = document.getElementById('message-text');
+        const playerHealthBar = document.getElementById('playerHealthBar');
+        const enemyHealthBar = document.getElementById('enemyHealthBar');
+        const skillSelectionScreen = document.getElementById('skillSelection');
+        const skillButtonsContainer = document.getElementById('skillButtons');
+
+        const gameInstructions = document.getElementById('gameInstructions');
+        const playerHealthContainer = document.getElementById('playerHealthContainer');
+        const playerHealthText = document.getElementById('playerHealthText');
+        const enemyHealthContainer = document.getElementById('enemyHealthContainer');
+        const enemyHealthText = document.getElementById('enemyHealthText');
+        const waveCounterElement = document.getElementById('wave-counter');
+        const enemyTypeElement = document.getElementById('enemy-type');
+        // 已移除 healCooldownStatusElement 的參考
+
+
+        // 定義生命回復常數 (每分鐘回 5 血)
+        const REGEN_INTERVAL = 60000; // 60 秒 (1 分鐘)
+        const REGEN_AMOUNT = 5;     // 每次回復 5 點生命
+
+        // 定義玩家物件
+        let player = {
+            x: 100,
+            y: canvas.height / 2,
+            size: 30,
+            speed: 5,
+            health: 200,
+            maxHealth: 200,
+            attackPower: 20, 
+            attackRange: 150,
+            color: '#4299e1',
+            isAttacking: false,
+            attackCooldown: 500, // 毫秒
+            lastAttackTime: 0,
+            criticalChance: 0,
+            criticalModifier: 1,
+            lifeLeech: 0,
+            lastRegenTime: 0, // 用於追蹤上次生命回復的時間
+            
+            // F 鍵治療屬性 (恢復為基礎數值)
+            healAmount: 5,
+            healCooldown: 20000, // 20 秒冷卻
+            lastHealTime: 0 
+        };
+        
+        let enemy = {};
+        let gameOver = false;
+        let wave = 0;
+        const maxWaves = 5; // 總共 5 波
+        const keys = {};
+
+        // 定義敵人類型 (已更新，難度逐波增加)
+        const enemyTypes = [
+            // 第 1 波：普通方塊
+            { name: '普通方塊', size: 40, health: 500, attackPower: 15, attackRange: 60, speed: 2, color: '#e53e3e' },
+            // 第 2 波：敏捷方塊 (血量和攻擊略微增加，速度保持快)
+            { name: '敏捷方塊', size: 30, health: 650, attackPower: 18, attackRange: 50, speed: 4, color: '#f6ad55' },
+            // 第 3 波：重裝方塊 (高血量高攻擊，速度慢)
+            { name: '重裝方塊', size: 50, health: 1000, attackPower: 25, attackRange: 70, speed: 1.5, color: '#a0aec0' },
+            // 第 4 波：毀滅方塊 (全面強化)
+            { name: '毀滅方塊', size: 55, health: 1500, attackPower: 35, attackRange: 80, speed: 3, color: '#ff0066' },
+            // 第 5 波：最終頭目 (終極挑戰)
+            { name: '最終頭目', size: 60, health: 2000, attackPower: 50, attackRange: 80, speed: 3.5, color: '#c53030' }
+        ];
+
+        // 定義技能選項 (已移除緊急治療強化)
+        const skills = {
+            strength: {
+                name: '強壯方塊',
+                description: '攻擊力增加 (x1.5)',
+                attackPowerModifier: 1.5,
+                healthModifier: 1,
+                speedModifier: 1,
+                criticalChance: 0,
+                lifeLeech: 0
+            },
+            agility: {
+                name: '敏捷方塊',
+                description: '移動速度增加 (x1.5)',
+                attackPowerModifier: 1,
+                healthModifier: 1,
+                speedModifier: 1.5,
+                criticalChance: 0,
+                lifeLeech: 0
+            },
+            toughness: {
+                name: '堅韌方塊',
+                description: '生命值增加 (x1.5)',
+                attackPowerModifier: 1,
+                healthModifier: 1.5,
+                speedModifier: 1,
+                criticalChance: 0,
+                lifeLeech: 0
+            },
+            critical: {
+                name: '致命打擊',
+                description: '20% 機率造成雙倍傷害',
+                attackPowerModifier: 1,
+                healthModifier: 1,
+                speedModifier: 1,
+                criticalChance: 0.2,
+                criticalModifier: 2
+            },
+            lifesteal: {
+                name: '生命偷取',
+                description: '將傷害的 30% 轉化為生命值',
+                attackPowerModifier: 1,
+                healthModifier: 1,
+                speedModifier: 1,
+                criticalChance: 0,
+                lifeLeech: 0.3
+            }
+        };
+
+        // 處理鍵盤輸入
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // 顯示訊息框
+        function showMessage(text) {
+            messageTextElement.innerText = text;
+            messageBox.style.display = 'block';
+            gameOver = true;
+        }
+
+        // 重新開始遊戲
+        function restartGame() {
+            // 重置玩家屬性
+            player = {
+                x: 100, y: canvas.height / 2, size: 30, speed: 5, health: 200, maxHealth: 200, attackPower: 20,
+                attackRange: 150, color: '#4299e1', isAttacking: false, attackCooldown: 500, lastAttackTime: 0,
+                criticalChance: 0, criticalModifier: 1, lifeLeech: 0, lastRegenTime: 0,
+                // 基礎治療屬性
+                healAmount: 5,
+                healCooldown: 20000,
+                lastHealTime: 0
+            };
+            wave = 0; 
+            gameOver = false;
+            messageBox.style.display = 'none';
+            showSkillSelection();
+        }
+
+        // 根據波數生成下一個敵人
+        function spawnNextEnemy() {
+            wave++;
+            if (wave > maxWaves) {
+                showMessage("恭喜你！你贏了！你擊敗了所有 " + maxWaves + " 波敵人！");
+                return;
+            }
+
+            const enemyTypeIndex = Math.min(wave - 1, enemyTypes.length - 1);
+            const newEnemyData = enemyTypes[enemyTypeIndex];
+
+            // 分配新敵人的屬性
+            enemy.name = newEnemyData.name;
+            enemy.size = newEnemyData.size;
+            enemy.maxHealth = newEnemyData.health;
+            enemy.health = newEnemyData.health;
+            enemy.attackPower = newEnemyData.attackPower;
+            enemy.attackRange = newEnemyData.attackRange;
+            enemy.speed = newEnemyData.speed;
+            enemy.color = newEnemyData.color;
+            enemy.attackCooldown = 800;
+            enemy.lastAttackTime = 0;
+
+            // 重設敵人位置
+            enemy.x = canvas.width - 100;
+            enemy.y = canvas.height / 2;
+
+            // 更新 UI 元素
+            waveCounterElement.innerText = `第 ${wave} 波 (共 ${maxWaves} 波)`;
+            enemyTypeElement.innerText = `敵人: ${enemy.name}`;
+            enemyHealthBar.style.backgroundColor = enemy.color;
+        }
+
+        // 顯示技能選擇畫面
+        function showSkillSelection() {
+            skillSelectionScreen.style.display = 'flex';
+            canvas.style.display = 'none';
+            playerHealthContainer.style.display = 'none';
+            playerHealthText.style.display = 'none';
+            enemyHealthContainer.style.display = 'none';
+            enemyHealthText.style.display = 'none';
+            gameInstructions.style.display = 'none';
+            waveCounterElement.style.display = 'none';
+            enemyTypeElement.style.display = 'none';
+            // 已移除隱藏冷卻狀態的邏輯
+
+            skillButtonsContainer.innerHTML = '';
+            for (const skillKey in skills) {
+                const skill = skills[skillKey];
+                const button = document.createElement('button');
+                button.className = 'skill-button';
+                button.innerHTML = `<span class="skill-button-title">${skill.name}</span><br>${skill.description}`;
+                button.onclick = () => selectSkill(skillKey);
+                skillButtonsContainer.appendChild(button);
+            }
+        }
+
+        // 應用選擇的技能並開始遊戲
+        function selectSkill(skillKey) {
+            const selectedSkill = skills[skillKey];
+            player.maxHealth *= selectedSkill.healthModifier;
+            player.health = player.maxHealth;
+            player.attackPower *= selectedSkill.attackPowerModifier;
+            player.speed *= selectedSkill.speedModifier;
+            player.criticalChance = selectedSkill.criticalChance || 0;
+            player.criticalModifier = selectedSkill.criticalModifier || 1;
+            player.lifeLeech = selectedSkill.lifeLeech || 0;
+
+            // 已移除緊急治療強化技能的效果應用邏輯
+
+            startGame();
+        }
+
+        // 隱藏技能選擇畫面並開始遊戲
+        function startGame() {
+            skillSelectionScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            playerHealthContainer.style.display = 'block';
+            playerHealthText.style.display = 'block';
+            enemyHealthContainer.style.display = 'block';
+            enemyHealthText.style.display = 'block';
+            gameInstructions.style.display = 'block';
+            waveCounterElement.style.display = 'block';
+            enemyTypeElement.style.display = 'block';
+            // 已移除顯示冷卻狀態的邏輯
+
+            // 遊戲開始時重設生命回復計時器
+            player.lastRegenTime = Date.now();
+            spawnNextEnemy();
+            gameLoop(0);
+        }
+
+        // 更新遊戲狀態
+        function update(deltaTime) {
+            if (gameOver) return;
+
+            // --- 玩家更新 ---
+            if (keys['w'] || keys['W'] || keys['ArrowUp']) {
+                player.y -= player.speed;
+            }
+            if (keys['s'] || keys['S'] || keys['ArrowDown']) {
+                player.y += player.speed;
+            }
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) {
+                player.x -= player.speed;
+            }
+            if (keys['d'] || keys['D'] || keys['ArrowRight']) {
+                player.x += player.speed;
+            }
+
+            // 將玩家限制在畫布內
+            player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+            // F 鍵治療邏輯 (基礎治療，回 5 點血，冷卻 20 秒)
+            const currentTime = Date.now();
+
+            if (keys['f'] || keys['F']) {
+                if (currentTime - player.lastHealTime > player.healCooldown) {
+                    if (player.health < player.maxHealth) {
+                        player.health = Math.min(player.maxHealth, player.health + player.healAmount);
+                        player.lastHealTime = currentTime;
+                        console.log(`[F] 治療: 回復了 ${player.healAmount} HP! (冷卻 ${player.healCooldown / 1000} 秒)`);
+                    }
+                }
+            }
+            
+            // 已移除複雜的 F 鍵治療 UI 狀態更新邏輯
+
+            // 玩家生命回復邏輯 (每分鐘回 5 血)
+            if (player.health < player.maxHealth && Date.now() - player.lastRegenTime > REGEN_INTERVAL) {
+                player.health = Math.min(player.maxHealth, player.health + REGEN_AMOUNT);
+                player.lastRegenTime = Date.now();
+                // console.log(`玩家回復了 ${REGEN_AMOUNT} 點生命值！(自然回血)`);
+            }
+
+            // 玩家攻擊邏輯
+            if (keys[' '] && Date.now() - player.lastAttackTime > player.attackCooldown) {
+                player.lastAttackTime = Date.now();
+                const distance = Math.sqrt(Math.pow(player.x - enemy.x, 2) + Math.pow(player.y - enemy.y, 2));
+                if (distance <= player.attackRange) {
+                    // 計算傷害並考慮致命一擊
+                    let damageDealt = player.attackPower;
+                    if (Math.random() < player.criticalChance) {
+                        damageDealt *= player.criticalModifier;
+                        // console.log("致命打擊！");
+                    }
+
+                    enemy.health -= damageDealt;
+
+                    // 應用生命偷取
+                    if (player.lifeLeech > 0) {
+                        const healthRestored = damageDealt * player.lifeLeech;
+                        player.health = Math.min(player.maxHealth, player.health + healthRestored);
+                    }
+
+                    if (enemy.health <= 0) {
+                        spawnNextEnemy();
+                    }
+                }
+            }
+
+            // --- 敵人更新 ---
+            // 簡單的追蹤 AI
+            if (player.x < enemy.x) {
+                enemy.x -= enemy.speed;
+            } else if (player.x > enemy.x) {
+                enemy.x += enemy.speed;
+            }
+
+            if (player.y < enemy.y) {
+                enemy.y -= enemy.speed;
+            } else if (player.y > enemy.y) {
+                enemy.y += enemy.speed;
+            }
+
+            // 敵人攻擊
+            const distanceToPlayer = Math.sqrt(Math.pow(enemy.x - player.x, 2) + Math.pow(enemy.y - player.y, 2));
+            if (distanceToPlayer <= enemy.attackRange && Date.now() - enemy.lastAttackTime > enemy.attackCooldown) {
+                enemy.lastAttackTime = Date.now();
+                player.health -= enemy.attackPower;
+
+                if (player.health <= 0) {
+                    showMessage("你被敵人擊敗了！遊戲結束。");
+                }
+            }
+
+            // 更新生命條
+            playerHealthBar.style.width = `${Math.max(0, player.health / player.maxHealth) * 100}%`;
+            enemyHealthBar.style.width = `${Math.max(0, enemy.health / enemy.maxHealth) * 100}%`;
+        }
+
+        // 繪製遊戲畫面
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製敵人
+            ctx.fillStyle = enemy.color;
+            ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+
+            // 繪製玩家
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+        }
+
+        let lastTime = 0;
+
+        // 主要遊戲循環
+        function gameLoop(time) {
+            if (gameOver) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            update(deltaTime);
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 在窗口載入後開始遊戲
+        window.onload = function () {
+            showSkillSelection();
+        };
+    </script>
+</body>
+</html>
